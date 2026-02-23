@@ -1,12 +1,12 @@
 # mpr-monitor
 
-Lightweight web dashboard for monitoring FreeBSD `mpr` (Broadcom/LSI SAS HBA) driver DMA chain frame utilization.
+Lightweight web dashboard for monitoring FreeBSD `mpr` and `mps` (Broadcom/LSI SAS HBA) driver DMA chain frame utilization.
 
 Designed for production storage servers where chain frame exhaustion can cause I/O stalls and system freezes.
 
 ## What it monitors
 
-For each detected `mpr` controller (up to 6):
+For each detected `mpr` or `mps` controller (up to 6 per driver):
 
 | Metric | Description |
 |--------|-------------|
@@ -32,7 +32,7 @@ Three components, no external dependencies beyond Python 3.11:
 
 - FreeBSD (tested on 14.x)
 - Python 3 (`pkg install python3`)
-- One or more Broadcom/LSI SAS HBA controllers using the `mpr` driver
+- One or more Broadcom/LSI SAS HBA controllers using the `mpr` or `mps` driver
 - Network access to port 8080 (internal/firewalled networks — no authentication)
 
 ## Quick install
@@ -54,7 +54,7 @@ fetch -o - https://github.com/YOURUSERNAME/mpr-monitor/archive/refs/heads/main.t
 The installer will:
 
 1. Verify Python 3.11 is available
-2. Verify at least one `mpr` controller exists
+2. Verify at least one `mpr` or `mps` controller exists
 3. Install application files to `/usr/local/share/mpr_monitor/`
 4. Install rc.d service scripts to `/usr/local/etc/rc.d/`
 5. Enable and start both services
@@ -95,8 +95,8 @@ Installed files:
     mpr_collect                 rc.d service: data collector
 
 /var/log/mpr_monitor/
-    mpr0_stats.csv              CSV data for controller 0
-    mpr1_stats.csv              CSV data for controller 1
+    mpr0_stats.csv              CSV data for mpr controller 0
+    mps0_stats.csv              CSV data for mps controller 0
     ...                         (one file per detected controller)
 
 /var/log/
@@ -121,14 +121,15 @@ service mpr_monitor stop
 
 ## Background: why this exists
 
-The `mpr` driver uses DMA chain frames to map scatter/gather lists for I/O operations. Under heavy load (many drives, concurrent ZFS operations, Samba clients), the default allocation of 16384 chain frames can be exhausted. When this happens, the driver cannot submit new I/O, which stalls the system.
+The `mpr` and `mps` drivers use DMA chain frames to map scatter/gather lists for I/O operations. Under heavy load (many drives, concurrent ZFS operations, Samba clients), the default allocation of 16384 chain frames can be exhausted. When this happens, the driver cannot submit new I/O, which stalls the system.
 
-The fix is to increase `hw.mpr.max_chains` in `/boot/loader.conf`, but you need visibility into actual utilization to choose the right value. This tool provides that visibility.
+The fix is to increase `hw.mpr.max_chains` (or `hw.mps.max_chains`) in `/boot/loader.conf`, but you need visibility into actual utilization to choose the right value. This tool provides that visibility.
 
-Key `loader.conf` tunable:
+Key `loader.conf` tunables:
 
 ```
 hw.mpr.max_chains=65536
+hw.mps.max_chains=65536
 ```
 
 This requires a reboot to take effect. Use this dashboard to monitor chain frame consumption under real workload and determine the appropriate value before and after the change.

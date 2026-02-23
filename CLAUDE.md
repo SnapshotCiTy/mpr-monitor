@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-mpr-monitor is a FreeBSD monitoring dashboard for Broadcom/LSI SAS HBA (`mpr` driver) DMA chain frame utilization. It tracks chain frame exhaustion which can cause I/O stalls on production storage servers.
+mpr-monitor is a FreeBSD monitoring dashboard for Broadcom/LSI SAS HBA (`mpr` and `mps` driver) DMA chain frame utilization. It tracks chain frame exhaustion which can cause I/O stalls on production storage servers.
 
 **Platform:** FreeBSD 14.x, Python 3 (stdlib only, no external dependencies).
 
@@ -12,12 +12,12 @@ mpr-monitor is a FreeBSD monitoring dashboard for Broadcom/LSI SAS HBA (`mpr` dr
 
 Three independent components with no shared state except CSV files:
 
-1. **Data Collector** (`src/mpr_collect.sh`) — Shell daemon that polls `sysctl dev.mpr.N.*` every 60 seconds and appends rows to per-controller CSV files in `/var/log/mpr_monitor/`.
+1. **Data Collector** (`src/mpr_collect.sh`) — Shell daemon that polls `sysctl dev.mpr.N.*` and `dev.mps.N.*` every 60 seconds and appends rows to per-controller CSV files in `/var/log/mpr_monitor/`.
 
 2. **HTTP Server** (`src/mpr_monitor_httpd.py`) — Python stdlib `http.server` on port 8080. Three routes:
    - `GET /` → serves `index.html`
-   - `GET /api/controllers` → JSON list of detected mpr controllers
-   - `GET /data/mprN_stats.csv` → CSV data (N restricted to 0–5)
+   - `GET /api/controllers` → JSON list of detected mpr/mps controllers
+   - `GET /data/<name>_stats.csv` → CSV data (mpr0–5, mps0–5)
 
 3. **Dashboard** (`src/index.html`) — Single-file SPA using Chart.js (CDN). Parses CSV client-side, renders charts, auto-reloads every 30/60/300s. Health indicators are color-coded by lowwater percentage (green >50%, yellow 15–50%, red <15% or any alloc failures).
 

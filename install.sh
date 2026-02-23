@@ -39,14 +39,16 @@ check_python() {
 
 check_mpr() {
     found=0
-    for i in 0 1 2 3 4 5; do
-        if sysctl -n dev.mpr.${i}.chain_free > /dev/null 2>&1; then
-            found=1
-            break
-        fi
+    for drv in mpr mps; do
+        for i in 0 1 2 3 4 5; do
+            if sysctl -n dev.${drv}.${i}.chain_free > /dev/null 2>&1; then
+                found=1
+                break 2
+            fi
+        done
     done
     if [ ${found} -eq 0 ]; then
-        error "No mpr controllers detected on this system."
+        error "No mpr or mps controllers detected on this system."
         exit 1
     fi
 }

@@ -6,7 +6,7 @@ Serves the dashboard and per-controller CSV data files.
 Listens on 0.0.0.0:8080
   GET /                -> index.html
   GET /api/controllers -> JSON list of detected controllers
-  GET /data/mprN.csv   -> CSV data for controller N
+  GET /data/<name>_stats.csv -> CSV data for controller (mpr0-5, mps0-5)
 """
 
 import http.server
@@ -33,8 +33,8 @@ class MPRHandler(http.server.BaseHTTPRequestHandler):
 
         elif path.startswith('/data/') and path.endswith('.csv'):
             filename = os.path.basename(path)
-            # Only allow mprN_stats.csv pattern
-            if re.match(r'^mpr[0-5]_stats\.csv$', filename):
+            # Only allow mprN_stats.csv and mpsN_stats.csv patterns
+            if re.match(r'^mp[rs][0-5]_stats\.csv$', filename):
                 self.serve_file(os.path.join(DATA_DIR, filename), 'text/csv')
             else:
                 self.send_error(404)
@@ -44,15 +44,16 @@ class MPRHandler(http.server.BaseHTTPRequestHandler):
     def serve_controllers(self):
         """Return JSON list of controllers that have CSV data files."""
         controllers = []
-        for i in range(6):
-            csv_path = os.path.join(DATA_DIR, f'mpr{i}_stats.csv')
-            if os.path.exists(csv_path) and os.path.getsize(csv_path) > 0:
-                # Read first data line to check there's actual data
-                controllers.append({
-                    'id': i,
-                    'name': f'mpr{i}',
-                    'csv': f'/data/mpr{i}_stats.csv'
-                })
+        for drv in ('mpr', 'mps'):
+            for i in range(6):
+                name = f'{drv}{i}'
+                csv_path = os.path.join(DATA_DIR, f'{name}_stats.csv')
+                if os.path.exists(csv_path) and os.path.getsize(csv_path) > 0:
+                    controllers.append({
+                        'id': name,
+                        'name': name,
+                        'csv': f'/data/{name}_stats.csv'
+                    })
 
         content = json.dumps(controllers).encode('utf-8')
         self.send_response(200)
