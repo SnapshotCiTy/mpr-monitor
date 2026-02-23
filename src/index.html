@@ -317,11 +317,12 @@
   </div>
 
   <div class="toolbar">
-    <label><input type="checkbox" id="autoReload"> Auto-reload every</label>
+    <label><input type="checkbox" id="autoReload" checked> Auto-reload every</label>
     <select id="reloadInterval">
-      <option value="30" selected>30s</option>
-      <option value="60">60s</option>
-      <option value="300">5m</option>
+      <option value="5">5s</option>
+      <option value="10" selected>10s</option>
+      <option value="30">30s</option>
+      <option value="60">1m</option>
     </select>
     <span class="sep">|</span>
     <span id="lastUpdate"></span>
@@ -730,7 +731,9 @@
     if (cb.checked) cb.dispatchEvent(new Event('change'));
   });
 
-  init();
+  init().then(() => {
+    document.getElementById('autoReload').dispatchEvent(new Event('change'));
+  });
 </script>
 
 </body>
