@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mpr-monitor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0e14;
+    --surface: #111923;
+    --border: #1e2a3a;
+    --text: #c5cdd8;
+    --text-dim: #5c6a7a;
+    --accent: #ff6b35;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --blue: #3b82f6;
+    --cyan: #06b6d4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  .header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+
+  h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .tab {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 20px;
+    background: transparent;
+    color: var(--text-dim);
+    border: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .tab:hover {
+    color: var(--text);
+  }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab .tab-status {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  .tab .tab-status.ok { background: var(--green); }
+  .tab .tab-status.warn { background: var(--yellow); }
+  .tab .tab-status.danger { background: var(--red); }
+
+  /* Status messages */
+  .status-msg {
+    text-align: center;
+    padding: 48px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+
+  .error-msg {
+    color: var(--red);
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+
+  .stat-card .label {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+
+  .stat-card .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .stat-card .detail {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .ok { color: var(--green); }
+  .warn { color: var(--yellow); }
+  .danger { color: var(--red); }
+
+  /* Charts */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .chart-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  .chart-panel h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .chart-container {
+    position: relative;
+    height: 280px;
+  }
+
+  .hidden { display: none; }
+
+  .alert-banner {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--red);
+  }
+
+  .warn-banner {
+    background: rgba(234, 179, 8, 0.08);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--yellow);
+  }
+
+  .safe-banner {
+    background: rgba(34, 197, 94, 0.08);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--green);
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 900px) {
+    .two-col { grid-template-columns: 1fr; }
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 16px;
+    justify-content: center;
+  }
+
+  .toolbar label { cursor: pointer; }
+  .toolbar select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+
+  .toolbar .sep { color: var(--border); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>mpr-monitor</h1>
+  <span class="subtitle">FreeBSD HBA DMA chain frame utilization</span>
+</div>
+
+<div id="tabs" class="tabs"></div>
+<div id="statusMsg" class="status-msg">Detecting controllers...</div>
+<div id="controllerView" class="hidden">
+  <div id="alertBanner"></div>
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="label">Current chain_free</div>
+      <div class="value" id="statChainFree">—</div>
+      <div class="detail">of <span id="statMaxChains">—</span> max</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Lowwater mark</div>
+      <div class="value" id="statLowwater">—</div>
+      <div class="detail">lowest since boot</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Alloc failures</div>
+      <div class="value" id="statAllocFail">—</div>
+      <div class="detail">should always be 0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">io_cmds active</div>
+      <div class="value" id="statIoCmds">—</div>
+      <div class="detail">latest sample</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">io_cmds highwater</div>
+      <div class="value" id="statIoCmdsHw">—</div>
+      <div class="detail">peak since boot</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Data points</div>
+      <div class="value" id="statPoints">—</div>
+      <div class="detail">over <span id="statDuration">—</span></div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-panel">
+      <h3>Chain frames free over time</h3>
+      <div class="chart-container">
+        <canvas id="chartChainFree"></canvas>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="chart-panel">
+        <h3>Active I/O commands</h3>
+        <div class="chart-container">
+          <canvas id="chartIoCmds"></canvas>
+        </div>
+      </div>
+      <div class="chart-panel">
+        <h3>Allocation failures (cumulative)</h3>
+        <div class="chart-container">
+          <canvas id="chartAllocFail"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <label><input type="checkbox" id="autoReload"> Auto-reload every</label>
+    <select id="reloadInterval">
+      <option value="30" selected>30s</option>
+      <option value="60">60s</option>
+      <option value="300">5m</option>
+    </select>
+    <span class="sep">|</span>
+    <span id="lastUpdate"></span>
+  </div>
+</div>
+
+<script>
+  let chartChainFree = null;
+  let chartIoCmds = null;
+  let chartAllocFail = null;
+  let reloadTimer = null;
+  let spanMultipleDays = false;
+  let controllers = [];
+  let activeController = null;
+
+  // Per-controller health cache for tab indicators
+  const controllerHealth = {};
+
+  const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 300 },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#111923',
+        borderColor: '#1e2a3a',
+        borderWidth: 1,
+        titleFont: { family: 'JetBrains Mono', size: 11 },
+        bodyFont: { family: 'JetBrains Mono', size: 11 },
+        padding: 10
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          font: { family: 'JetBrains Mono', size: 10 },
+          color: '#5c6a7a',
+          maxTicksLimit: 12,
+          maxRotation: 45
+        },
+        grid: { color: 'rgba(30,42,58,0.5)' }
+      },
+      y: {
+        ticks: {
+          font: { family: 'JetBrains Mono', size: 10 },
+          color: '#5c6a7a'
+        },
+        grid: { color: 'rgba(30,42,58,0.5)' },
+        beginAtZero: true
+      }
+    }
+  };
+
+  function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    let startIdx = 0;
+    if (lines[0] && lines[0].toLowerCase().includes('timestamp')) {
+      startIdx = 1;
+    }
+    const data = [];
+    for (let i = startIdx; i < lines.length; i++) {
+      const parts = lines[i].split(',');
+      if (parts.length < 5) continue;
+      const ts = parts[0].trim();
+      const chainFree = parseInt(parts[1]);
+      const lowwater = parseInt(parts[2]);
+      const allocFail = parseInt(parts[3]);
+      const ioCmds = parseInt(parts[4]);
+      const ioCmdsHw = parts.length >= 6 ? parseInt(parts[5]) : null;
+      if (isNaN(chainFree)) continue;
+      data.push({ timestamp: ts, chainFree, lowwater, allocFail, ioCmds, ioCmdsHw });
+    }
+    return data;
+  }
+
+  function formatTime(ts) {
+    const d = new Date(ts);
+    if (!isNaN(d)) {
+      if (spanMultipleDays) {
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const mins = String(d.getMinutes()).padStart(2, '0');
+        return `${month}-${day} ${hours}:${mins}`;
+      }
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      return `${hours}:${mins}`;
+    }
+    const match = ts.match(/(\d{2}):(\d{2}):(\d{2})/);
+    if (match) return `${match[1]}:${match[2]}`;
+    return ts;
+  }
+
+  function detectTimeSpan(data) {
+    if (data.length < 2) return;
+    const first = new Date(data[0].timestamp);
+    const last = new Date(data[data.length - 1].timestamp);
+    if (!isNaN(first) && !isNaN(last)) {
+      spanMultipleDays = (last - first) > 24 * 3600 * 1000;
+    }
+  }
+
+  function formatDuration(data) {
+    if (data.length < 2) return '—';
+    const first = new Date(data[0].timestamp);
+    const last = new Date(data[data.length - 1].timestamp);
+    const diffMs = last - first;
+    if (isNaN(diffMs)) return `${data.length} samples`;
+    const hours = Math.floor(diffMs / 3600000);
+    const mins = Math.floor((diffMs % 3600000) / 60000);
+    if (hours > 24) {
+      const days = Math.floor(hours / 24);
+      return `${days}d ${hours % 24}h`;
+    }
+    if (hours > 0) return `${hours}h ${mins}m`;
+    return `${mins}m`;
+  }
+
+  function getStatusClass(lowwater, max) {
+    const pct = lowwater / max;
+    if (pct > 0.5) return 'ok';
+    if (pct > 0.15) return 'warn';
+    return 'danger';
+  }
+
+  function updateTabIndicators() {
+    controllers.forEach(c => {
+      const dot = document.getElementById(`tab-status-${c.id}`);
+      if (dot && controllerHealth[c.id]) {
+        dot.className = `tab-status ${controllerHealth[c.id]}`;
+      }
+    });
+  }
+
+  function renderDashboard(data, controllerId) {
+    if (data.length === 0) {
+      document.getElementById('statusMsg').textContent = 'No data rows yet for this controller.';
+      document.getElementById('statusMsg').classList.remove('hidden');
+      document.getElementById('controllerView').classList.add('hidden');
+      return;
+    }
+
+    detectTimeSpan(data);
+
+    document.getElementById('statusMsg').classList.add('hidden');
+    document.getElementById('controllerView').classList.remove('hidden');
+
+    const last = data[data.length - 1];
+    const maxChains = Math.max(...data.map(d => d.chainFree));
+    const minLowwater = Math.min(...data.map(d => d.lowwater));
+    const maxAllocFail = Math.max(...data.map(d => d.allocFail));
+    const maxIoCmds = Math.max(...data.map(d => d.ioCmds));
+    const maxIoCmdsHw = Math.max(...data.filter(d => d.ioCmdsHw !== null).map(d => d.ioCmdsHw));
+
+    // Update health cache for tab indicator
+    controllerHealth[controllerId] = getStatusClass(minLowwater, maxChains);
+    if (maxAllocFail > 0) controllerHealth[controllerId] = 'danger';
+    updateTabIndicators();
+
+    const statusClass = getStatusClass(last.chainFree, maxChains);
+    document.getElementById('statChainFree').className = `value ${statusClass}`;
+    document.getElementById('statChainFree').textContent = last.chainFree.toLocaleString();
+    document.getElementById('statMaxChains').textContent = maxChains.toLocaleString();
+
+    const lwClass = getStatusClass(minLowwater, maxChains);
+    document.getElementById('statLowwater').className = `value ${lwClass}`;
+    document.getElementById('statLowwater').textContent = minLowwater.toLocaleString();
+
+    document.getElementById('statAllocFail').className = `value ${maxAllocFail > 0 ? 'danger' : 'ok'}`;
+    document.getElementById('statAllocFail').textContent = maxAllocFail.toLocaleString();
+
+    document.getElementById('statIoCmds').textContent = last.ioCmds.toLocaleString();
+    document.getElementById('statIoCmdsHw').textContent = isNaN(maxIoCmdsHw) ? '—' : maxIoCmdsHw.toLocaleString();
+    document.getElementById('statPoints').textContent = data.length.toLocaleString();
+    document.getElementById('statDuration').textContent = formatDuration(data);
+
+    // Alert banner
+    const banner = document.getElementById('alertBanner');
+    if (maxAllocFail > 0) {
+      banner.className = 'alert-banner';
+      banner.innerHTML = `⚠ ALLOCATION FAILURES DETECTED: ${maxAllocFail} — I/O is being starved. Reboot with increased max_chains urgently.`;
+    } else if (minLowwater < maxChains * 0.15) {
+      banner.className = 'alert-banner';
+      banner.innerHTML = `⚠ chain_free_lowwater dropped to ${minLowwater.toLocaleString()} (${((minLowwater/maxChains)*100).toFixed(1)}% remaining) — approaching exhaustion. Plan reboot soon.`;
+    } else if (minLowwater < maxChains * 0.5) {
+      banner.className = 'warn-banner';
+      banner.innerHTML = `Chain frames dropping — lowwater at ${minLowwater.toLocaleString()} (${((minLowwater/maxChains)*100).toFixed(1)}% remaining). Monitor closely.`;
+    } else {
+      banner.className = 'safe-banner';
+      banner.innerHTML = `Chain frames healthy — lowwater at ${minLowwater.toLocaleString()} (${((minLowwater/maxChains)*100).toFixed(1)}% remaining).`;
+    }
+
+    const labels = data.map(d => formatTime(d.timestamp));
+
+    let displayData = data;
+    let displayLabels = labels;
+    if (data.length > 500) {
+      const step = Math.ceil(data.length / 500);
+      displayData = data.filter((_, i) => i % step === 0 || i === data.length - 1);
+      displayLabels = labels.filter((_, i) => i % step === 0 || i === labels.length - 1);
+    }
+
+    // Chain free chart
+    if (chartChainFree) chartChainFree.destroy();
+    chartChainFree = new Chart(document.getElementById('chartChainFree'), {
+      type: 'line',
+      data: {
+        labels: displayLabels,
+        datasets: [
+          {
+            label: 'chain_free',
+            data: displayData.map(d => d.chainFree),
+            borderColor: '#06b6d4',
+            backgroundColor: 'rgba(6, 182, 212, 0.08)',
+            borderWidth: 1.5,
+            pointRadius: displayData.length > 100 ? 0 : 2,
+            fill: true,
+            tension: 0.2
+          },
+          {
+            label: 'chain_free_lowwater',
+            data: displayData.map(d => d.lowwater),
+            borderColor: '#ff6b35',
+            borderWidth: 2,
+            borderDash: [6, 3],
+            pointRadius: 0,
+            fill: false,
+            tension: 0
+          }
+        ]
+      },
+      options: {
+        ...chartDefaults,
+        plugins: {
+          ...chartDefaults.plugins,
+          legend: {
+            display: true, position: 'top', align: 'end',
+            labels: { font: { family: 'JetBrains Mono', size: 11 }, color: '#5c6a7a', boxWidth: 20, padding: 16 }
+          }
+        },
+        scales: {
+          ...chartDefaults.scales,
+          y: { ...chartDefaults.scales.y, min: 0, max: Math.max(maxChains * 1.05, 16384) }
+        }
+      }
+    });
+
+    // IO cmds chart
+    if (chartIoCmds) chartIoCmds.destroy();
+    const ioCmdsDatasets = [{
+      label: 'io_cmds_active',
+      data: displayData.map(d => d.ioCmds),
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59, 130, 246, 0.08)',
+      borderWidth: 1.5,
+      pointRadius: displayData.length > 100 ? 0 : 2,
+      fill: true,
+      tension: 0.2
+    }];
+    if (displayData.some(d => d.ioCmdsHw !== null)) {
+      ioCmdsDatasets.push({
+        label: 'io_cmds_highwater',
+        data: displayData.map(d => d.ioCmdsHw),
+        borderColor: '#ff6b35',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        fill: false,
+        tension: 0
+      });
+    }
+    chartIoCmds = new Chart(document.getElementById('chartIoCmds'), {
+      type: 'line',
+      data: { labels: displayLabels, datasets: ioCmdsDatasets },
+      options: {
+        ...chartDefaults,
+        plugins: {
+          ...chartDefaults.plugins,
+          legend: {
+            display: ioCmdsDatasets.length > 1, position: 'top', align: 'end',
+            labels: { font: { family: 'JetBrains Mono', size: 11 }, color: '#5c6a7a', boxWidth: 20, padding: 16 }
+          }
+        }
+      }
+    });
+
+    // Alloc fail chart
+    if (chartAllocFail) chartAllocFail.destroy();
+    chartAllocFail = new Chart(document.getElementById('chartAllocFail'), {
+      type: 'line',
+      data: {
+        labels: displayLabels,
+        datasets: [{
+          label: 'chain_alloc_fail',
+          data: displayData.map(d => d.allocFail),
+          borderColor: maxAllocFail > 0 ? '#ef4444' : '#22c55e',
+          backgroundColor: maxAllocFail > 0 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(34, 197, 94, 0.08)',
+          borderWidth: 1.5,
+          pointRadius: displayData.length > 100 ? 0 : 2,
+          fill: true,
+          tension: 0.2
+        }]
+      },
+      options: chartDefaults
+    });
+
+    document.getElementById('lastUpdate').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+  }
+
+  async function loadController(controller) {
+    activeController = controller;
+
+    // Update tab active state
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    const tabEl = document.getElementById(`tab-${controller.id}`);
+    if (tabEl) tabEl.classList.add('active');
+
+    try {
+      const resp = await fetch(controller.csv + '?t=' + Date.now());
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const text = await resp.text();
+      const data = parseCSV(text);
+      renderDashboard(data, controller.id);
+    } catch (err) {
+      document.getElementById('statusMsg').textContent = `Failed to load data for ${controller.name}: ${err.message}`;
+      document.getElementById('statusMsg').className = 'status-msg error-msg';
+      document.getElementById('statusMsg').classList.remove('hidden');
+      document.getElementById('controllerView').classList.add('hidden');
+    }
+  }
+
+  function buildTabs() {
+    const tabBar = document.getElementById('tabs');
+    tabBar.innerHTML = '';
+    controllers.forEach((c, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'tab' + (idx === 0 ? ' active' : '');
+      btn.id = `tab-${c.id}`;
+      btn.innerHTML = `${c.name}<span class="tab-status" id="tab-status-${c.id}"></span>`;
+      btn.addEventListener('click', () => loadController(c));
+      tabBar.appendChild(btn);
+    });
+  }
+
+  async function refreshActiveController() {
+    if (activeController) {
+      await loadController(activeController);
+    }
+  }
+
+  async function refreshAllHealth() {
+    // Silently fetch all controllers to update tab health indicators
+    for (const c of controllers) {
+      try {
+        const resp = await fetch(c.csv + '?t=' + Date.now());
+        if (!resp.ok) continue;
+        const text = await resp.text();
+        const data = parseCSV(text);
+        if (data.length === 0) continue;
+        const maxChains = Math.max(...data.map(d => d.chainFree));
+        const minLowwater = Math.min(...data.map(d => d.lowwater));
+        const maxAllocFail = Math.max(...data.map(d => d.allocFail));
+        controllerHealth[c.id] = getStatusClass(minLowwater, maxChains);
+        if (maxAllocFail > 0) controllerHealth[c.id] = 'danger';
+      } catch (e) { /* skip */ }
+    }
+    updateTabIndicators();
+  }
+
+  async function init() {
+    try {
+      const resp = await fetch('/api/controllers?t=' + Date.now());
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      controllers = await resp.json();
+
+      if (controllers.length === 0) {
+        document.getElementById('statusMsg').textContent = 'No controllers detected. Waiting for data collection to start...';
+        return;
+      }
+
+      buildTabs();
+      await refreshAllHealth();
+      await loadController(controllers[0]);
+    } catch (err) {
+      document.getElementById('statusMsg').textContent = `Failed to detect controllers: ${err.message}`;
+      document.getElementById('statusMsg').className = 'status-msg error-msg';
+    }
+  }
+
+  // Auto-reload
+  document.getElementById('autoReload').addEventListener('change', (e) => {
+    if (reloadTimer) clearInterval(reloadTimer);
+    if (e.target.checked) {
+      const secs = parseInt(document.getElementById('reloadInterval').value);
+      reloadTimer = setInterval(async () => {
+        await refreshAllHealth();
+        await refreshActiveController();
+      }, secs * 1000);
+    }
+  });
+
+  document.getElementById('reloadInterval').addEventListener('change', () => {
+    const cb = document.getElementById('autoReload');
+    if (cb.checked) cb.dispatchEvent(new Event('change'));
+  });
+
+  init();
+</script>
+
+</body>
+</html>

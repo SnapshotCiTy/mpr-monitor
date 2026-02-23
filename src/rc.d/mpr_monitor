@@ -1,0 +1,52 @@
+#!/bin/sh
+
+# PROVIDE: mpr_monitor
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="mpr_monitor"
+rcvar="mpr_monitor_enable"
+
+command="/usr/local/bin/python3"
+command_args="/usr/local/share/mpr_monitor/mpr_monitor_httpd.py"
+
+pidfile="/var/run/${name}.pid"
+
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+status_cmd="${name}_status"
+
+mpr_monitor_start()
+{
+    echo "Starting ${name}."
+    /usr/sbin/daemon -p ${pidfile} -u nobody \
+        -o /var/log/mpr_monitor.log \
+        ${command} ${command_args}
+}
+
+mpr_monitor_stop()
+{
+    if [ -f ${pidfile} ]; then
+        echo "Stopping ${name}."
+        kill $(cat ${pidfile}) 2>/dev/null
+        rm -f ${pidfile}
+    else
+        echo "${name} is not running."
+    fi
+}
+
+mpr_monitor_status()
+{
+    if [ -f ${pidfile} ] && kill -0 $(cat ${pidfile}) 2>/dev/null; then
+        echo "${name} is running as pid $(cat ${pidfile})."
+    else
+        echo "${name} is not running."
+    fi
+}
+
+load_rc_config $name
+: ${mpr_monitor_enable:="NO"}
+
+run_rc_command "$1"

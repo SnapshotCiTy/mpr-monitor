@@ -1,0 +1,4 @@
+*.csv
+*.log
+*.pid
+.DS_Store
